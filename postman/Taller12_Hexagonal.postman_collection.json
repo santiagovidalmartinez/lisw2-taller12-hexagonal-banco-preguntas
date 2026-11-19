@@ -1,0 +1,309 @@
+{
+  "info": {
+    "name": "Taller 12 - Banco de Preguntas Hexagonal",
+    "description": "Ejecutar la colección completa con el adaptador JPA (perfil por defecto) y de nuevo con el adaptador en memoria (perfil memory). Los resultados deben ser idénticos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8085"
+    },
+    {
+      "key": "preguntaId",
+      "value": ""
+    },
+    {
+      "key": "preguntaIncompletaId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Crear pregunta válida (201 Created)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/preguntas",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "preguntas"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enunciado\": \"¿Cuál es la capital de Colombia?\",\n  \"justificacion\": \"Bogotá es la capital y sede del gobierno nacional.\",\n  \"opciones\": [\n    {\n      \"texto\": \"Medellín\",\n      \"correcta\": false\n    },\n    {\n      \"texto\": \"Bogotá\",\n      \"correcta\": true\n    },\n    {\n      \"texto\": \"Cali\",\n      \"correcta\": false\n    },\n    {\n      \"texto\": \"Popayán\",\n      \"correcta\": false\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Crea la pregunta en BORRADOR. Guarda el id en la variable preguntaId."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "const j = pm.response.json();",
+              "pm.test('Estado BORRADOR y 4 opciones', () => { pm.expect(j.estado).to.eql('BORRADOR'); pm.expect(j.opciones.length).to.eql(4); });",
+              "pm.test('Trae cabecera Location', () => pm.expect(pm.response.headers.has('Location')).to.be.true);",
+              "pm.collectionVariables.set('preguntaId', j.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Justificación corta (400 Bad Request)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/preguntas",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "preguntas"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enunciado\": \"¿Cuál es la capital de Colombia?\",\n  \"justificacion\": \"corta\",\n  \"opciones\": [\n    {\n      \"texto\": \"Medellín\",\n      \"correcta\": false\n    },\n    {\n      \"texto\": \"Bogotá\",\n      \"correcta\": true\n    },\n    {\n      \"texto\": \"Cali\",\n      \"correcta\": false\n    },\n    {\n      \"texto\": \"Popayán\",\n      \"correcta\": false\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "description": "Viola el invariante de la justificación (mínimo 15 caracteres)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+              "pm.test('Mensaje de regla de negocio', () => pm.expect(pm.response.json().error).to.include('al menos 15 caracteres'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Enviar a revisión (200 OK)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/preguntas/{{preguntaId}}/enviar-revision",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "preguntas",
+            "{{preguntaId}}",
+            "enviar-revision"
+          ]
+        },
+        "description": "Cumple 4 opciones y 1 clave: pasa de BORRADOR a PENDIENTE_REVISION."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Estado PENDIENTE_REVISION', () => pm.expect(pm.response.json().estado).to.eql('PENDIENTE_REVISION'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Consultar la pregunta (200 OK)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/preguntas/{{preguntaId}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "preguntas",
+            "{{preguntaId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Persistió el nuevo estado', () => pm.expect(pm.response.json().estado).to.eql('PENDIENTE_REVISION'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Crear pregunta con 3 opciones (201 Created)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/preguntas",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "preguntas"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enunciado\": \"¿Pregunta con solo tres opciones?\",\n  \"justificacion\": \"Justificación suficientemente larga para pasar\",\n  \"opciones\": [\n    {\n      \"texto\": \"A\",\n      \"correcta\": true\n    },\n    {\n      \"texto\": \"B\",\n      \"correcta\": false\n    },\n    {\n      \"texto\": \"C\",\n      \"correcta\": false\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created (un borrador puede estar incompleto)', () => pm.response.to.have.status(201));",
+              "pm.collectionVariables.set('preguntaIncompletaId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Enviar incompleta a revisión (400 Bad Request)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/preguntas/{{preguntaIncompletaId}}/enviar-revision",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "preguntas",
+            "{{preguntaIncompletaId}}",
+            "enviar-revision"
+          ]
+        },
+        "description": "El agregado impide el envío: solo tiene 3 opciones."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+              "pm.test('Exige exactamente 4 opciones', () => pm.expect(pm.response.json().error).to.include('exactamente 4 opciones'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Listar preguntas (200 OK)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/preguntas",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "preguntas"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "pm.test('Hay al menos 2 preguntas', () => pm.expect(pm.response.json().length).to.be.at.least(2));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Pregunta inexistente (404 Not Found)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/preguntas/00000000-0000-0000-0000-000000000000",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "preguntas",
+            "00000000-0000-0000-0000-000000000000"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('404 Not Found', () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
